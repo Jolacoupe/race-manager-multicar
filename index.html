@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Race Manager — RIS Timing Live</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+  :root {
+    --bg:#0a0e13;--bg2:#111720;--bg3:#1a2230;
+    --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.15);
+    --text:#e8edf5;--text2:#7a8a9e;--text3:#4a5a6e;
+    --green:#00e87a;--green-dim:rgba(0,232,122,0.12);
+    --amber:#f5a623;--amber-dim:rgba(245,166,35,0.12);
+    --red:#ff4757;--red-dim:rgba(255,71,87,0.12);
+    --blue:#3b9eff;--blue-dim:rgba(59,158,255,0.12);
+    --purple:#a78bfa;--purple-dim:rgba(167,139,250,0.12);
+    --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;min-height:100vh}
+  .header{background:var(--bg2);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+  .logo{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--green);letter-spacing:.05em}
+  .logo span{color:var(--text2);font-weight:400}
+  .session-name{font-size:11px;color:var(--text2);font-family:var(--mono)}
+  .status-pill{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.08em;padding:4px 10px;border-radius:2px;border:1px solid var(--border2);color:var(--text2);background:transparent}
+  .status-pill.live{background:var(--green-dim);border-color:var(--green);color:var(--green);animation:blink 2s infinite}
+  .status-pill.error{background:var(--red-dim);border-color:var(--red);color:var(--red)}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.6}}
+  .main{padding:12px 14px;max-width:960px;margin:0 auto}
+  .setup-panel{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:14px;margin-bottom:12px}
+  .panel-title{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;color:var(--text3);text-transform:uppercase;margin-bottom:10px}
+  .fields-row{display:flex;gap:8px;flex-wrap:wrap}
+  .field{flex:1;min-width:110px}
+  .field label{font-size:11px;color:var(--text2);display:block;margin-bottom:4px;font-family:var(--mono)}
+  input[type=number],input[type=text]{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:3px;color:var(--text);font-family:var(--mono);font-size:13px;padding:7px 10px;outline:none;transition:border-color .2s}
+  input:focus{border-color:var(--green)}
+  input::placeholder{color:var(--text3)}
+  .btn-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .btn{font-family:var(--mono);font-size:12px;font-weight:500;padding:8px 16px;border-radius:3px;border:1px solid var(--border2);background:transparent;color:var(--text);cursor:pointer;letter-spacing:.03em;transition:all .15s}
+  .btn:hover{background:var(--bg3);border-color:var(--text2)}
+  .btn.primary{background:var(--green);color:#000;border-color:var(--green);font-weight:600}
+  .btn.primary:hover{background:#00cc6a}
+  .btn.danger{border-color:var(--red);color:var(--red)}
+  .btn.danger:hover{background:var(--red-dim)}
+  .refresh-note{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:8px}
+  .car-bar{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--green);border-radius:4px;padding:12px 14px;margin-bottom:12px;display:none}
+  .car-bar-inner{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .car-num{font-family:var(--mono);font-size:28px;font-weight:600;color:var(--green);line-height:1}
+  .car-details{flex:1}
+  .car-team{font-size:14px;font-weight:600;color:var(--text)}
+  .car-driver{font-size:12px;color:var(--text2);font-family:var(--mono);margin-top:2px}
+  .car-tags{display:flex;gap:6px;margin-left:auto;align-items:center}
+  .tag{font-family:var(--mono);font-size:10px;font-weight:600;padding:3px 8px;border-radius:2px;letter-spacing:.05em}
+  .tag-pos{background:var(--bg3);color:var(--text2);border:1px solid var(--border2)}
+  .tag-run{background:var(--green-dim);color:var(--green);border:1px solid var(--green)}
+  .tag-in{background:var(--blue-dim);color:var(--blue);border:1px solid var(--blue)}
+  .tag-other{background:var(--bg3);color:var(--text2);border:1px solid var(--border)}
+  .alert{border-radius:3px;padding:10px 14px;font-family:var(--mono);font-size:12px;font-weight:500;display:none;align-items:center;gap:8px;margin-bottom:12px;border:1px solid}
+  .alert.ok{background:var(--green-dim);border-color:var(--green);color:var(--green)}
+  .alert.warn{background:var(--amber-dim);border-color:var(--amber);color:var(--amber)}
+  .alert.danger{background:var(--red-dim);border-color:var(--red);color:var(--red);animation:blink .8s infinite}
+  .alert.info{background:var(--blue-dim);border-color:var(--blue);color:var(--blue)}
+  .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+  @media(max-width:600px){.metrics{grid-template-columns:repeat(2,1fr)}}
+  .metric{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:12px}
+  .metric-label{font-family:var(--mono);font-size:10px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px}
+  .metric-value{font-family:var(--mono);font-size:24px;font-weight:600;color:var(--text);line-height:1}
+  .metric-value.green{color:var(--green)}
+  .metric-value.amber{color:var(--amber)}
+  .metric-value.red{color:var(--red)}
+  .metric-sub{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:4px}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+  @media(max-width:600px){.two-col{grid-template-columns:1fr}}
+  .sector-panel{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:14px}
+  .last-lap-time{font-family:var(--mono);font-size:32px;font-weight:600;color:var(--text);margin-bottom:8px}
+  .best-lap-line{font-family:var(--mono);font-size:11px;color:var(--text2);margin-bottom:10px}
+  .sectors{display:flex;gap:8px}
+  .sector{flex:1;background:var(--bg3);border-radius:3px;padding:8px;text-align:center}
+  .sector-label{font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+  .sector-val{font-family:var(--mono);font-size:14px;font-weight:500;color:var(--text)}
+  .stops-line{font-family:var(--mono);font-size:11px;color:var(--text2);margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+  .fuel-panel{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:14px}
+  .fuel-bar-bg{background:var(--bg3);border-radius:3px;height:8px;overflow:hidden;margin:8px 0}
+  .fuel-bar-fill{height:100%;border-radius:3px;transition:width .5s,background .5s}
+  .fuel-pct-row{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--text2)}
+  .conso-line{font-family:var(--mono);font-size:11px;color:var(--text2);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+  .fuel-input-row{display:flex;gap:8px;margin-top:10px;align-items:flex-end}
+  .fuel-input-row .field{flex:1}
+  .lap-panel{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:14px;margin-bottom:12px}
+  .lap-list{max-height:200px;overflow-y:auto}
+  .lap-row-item{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:12px}
+  .lap-row-item:last-child{border-bottom:none}
+  .l-num{color:var(--text3);min-width:32px}
+  .l-time{font-weight:600;color:var(--text);min-width:80px}
+  .l-delta{min-width:60px;font-size:11px}
+  .l-tag{font-size:9px;font-weight:600;padding:2px 5px;border-radius:2px;letter-spacing:.05em;margin-left:auto}
+  .l-tag.best{background:var(--green-dim);color:var(--green);border:1px solid var(--green)}
+  .l-tag.pit{background:var(--blue-dim);color:var(--blue);border:1px solid var(--blue)}
+  .empty-note{font-family:var(--mono);font-size:11px;color:var(--text3);padding:8px 0}
+
+  /* RIVALS */
+  .rivals-panel{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:14px;margin-bottom:12px}
+  .rivals-setup{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end}
+  .rivals-setup .field{flex:1;min-width:100px}
+  .rivals-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
+  .rivals-table th{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;padding:6px 8px;text-align:left;border-bottom:1px solid var(--border);font-weight:500}
+  .rivals-table td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
+  .rivals-table tr:last-child td{border-bottom:none}
+  .rivals-table tr.my-car td{background:var(--green-dim)}
+  .rivals-table tr.my-car .riv-num{color:var(--green)}
+  .riv-num{font-weight:600;color:var(--text)}
+  .riv-team{color:var(--text2);font-size:11px}
+  .riv-time{color:var(--text)}
+  .gap-ahead{color:var(--green);font-size:11px}
+  .gap-behind{color:var(--red);font-size:11px}
+  .gap-zero{color:var(--amber);font-size:11px}
+  .state-run{color:var(--green)}
+  .state-in{color:var(--blue)}
+  .btn-sm{font-family:var(--mono);font-size:11px;padding:4px 8px;border-radius:2px;border:1px solid var(--border2);background:transparent;color:var(--red);cursor:pointer}
+  .btn-sm:hover{background:var(--red-dim);border-color:var(--red)}
+  .footer{text-align:center;font-family:var(--mono);font-size:10px;color:var(--text3);padding:20px 0 30px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="logo">RACE<span>MGR</span> / RIS Live</div>
+    <div class="session-name" id="sessionName">—</div>
+  </div>
+  <span class="status-pill" id="statusBadge">DÉCONNECTÉ</span>
+</div>
+
+<div class="main">
+
+  <!-- SETUP -->
+  <div class="setup-panel">
+    <div class="panel-title">Configuration</div>
+    <div class="fields-row">
+      <div class="field">
+        <label>N° de voiture</label>
+        <input type="number" id="carNum" placeholder="ex: 42" min="1" max="999">
+      </div>
+      <div class="field" style="flex:2;min-width:200px">
+        <label>UUID session RIS</label>
+        <input type="text" id="uuidInput" placeholder="00000000-0000-0000-0000-000000000001">
+      </div>
+      <div class="field">
+        <label>Alerte carburant (tours)</label>
+        <input type="number" id="alertLaps" value="3" min="1" max="20">
+      </div>
+      <div class="field">
+        <label>Carburant initial (L)</label>
+        <input type="number" id="fuelInit" value="80" min="1" max="300">
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn primary" onclick="startLive()">▶ Connecter au live</button>
+      <button class="btn" onclick="stopLive()">⏸ Pause</button>
+      <button class="btn danger" onclick="resetAll()">↺ Réinitialiser</button>
+    </div>
+    <div class="refresh-note" id="refreshNote">Rafraîchissement automatique toutes les 5 secondes</div>
+  </div>
+
+  <!-- CAR INFO -->
+  <div class="car-bar" id="carBar">
+    <div class="car-bar-inner">
+      <div class="car-num" id="ciNum">#—</div>
+      <div class="car-details">
+        <div class="car-team" id="ciTeam">—</div>
+        <div class="car-driver" id="ciDriver">—</div>
+      </div>
+      <div class="car-tags">
+        <span class="tag tag-pos" id="ciPos">P—</span>
+        <span class="tag tag-other" id="ciState">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ALERT -->
+  <div class="alert" id="alertDiv"></div>
+
+  <!-- METRICS -->
+  <div class="metrics">
+    <div class="metric"><div class="metric-label">Tour actuel</div><div class="metric-value" id="mLap">—</div></div>
+    <div class="metric"><div class="metric-label">Dep. dernier stand</div><div class="metric-value" id="mSincePit">—</div><div class="metric-sub">tours</div></div>
+    <div class="metric"><div class="metric-label">Carburant estimé</div><div class="metric-value" id="mFuel">—</div><div class="metric-sub" id="mFuelSub">—</div></div>
+    <div class="metric"><div class="metric-label">Tours restants</div><div class="metric-value" id="mLeft">—</div><div class="metric-sub">estimés</div></div>
+  </div>
+
+  <!-- TWO COL -->
+  <div class="two-col">
+    <div class="sector-panel">
+      <div class="panel-title">Dernier tour</div>
+      <div class="last-lap-time" id="lastLapBig">—</div>
+      <div class="best-lap-line">Meilleur : <strong id="bestLapVal">—</strong></div>
+      <div class="sectors">
+        <div class="sector"><div class="sector-label">S1</div><div class="sector-val" id="s1Val">—</div></div>
+        <div class="sector"><div class="sector-label">S2</div><div class="sector-val" id="s2Val">—</div></div>
+        <div class="sector"><div class="sector-label">S3</div><div class="sector-val" id="s3Val">—</div></div>
+      </div>
+      <div class="stops-line" id="stopsLine">Arrêts : — | Temps stand total : —</div>
+    </div>
+    <div class="fuel-panel">
+      <div class="panel-title">Carburant</div>
+      <div class="fuel-pct-row"><span>Niveau réservoir</span><span id="fuelPct">—</span></div>
+      <div class="fuel-bar-bg"><div class="fuel-bar-fill" id="fuelBar" style="width:0%;background:var(--green)"></div></div>
+      <div class="conso-line">Conso/tour : <strong id="consoVal">à calculer</strong></div>
+      <div class="fuel-input-row">
+        <div class="field"><label>Litres ajoutés au stand</label><input type="number" id="fuelAdded" placeholder="ex: 30" min="0" max="300"></div>
+        <button class="btn primary" onclick="addFuel()" style="padding:7px 14px;font-size:12px">Valider</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIVALS -->
+  <div class="rivals-panel">
+    <div class="panel-title">Voitures rivales</div>
+    <div class="rivals-setup">
+      <div class="field"><label>Ajouter un rival (n° voiture)</label><input type="number" id="rivalInput" placeholder="ex: 518" min="1" max="999"></div>
+      <button class="btn primary" onclick="addRival()" style="padding:7px 14px;font-size:12px">+ Ajouter</button>
+    </div>
+    <div id="rivalsTableWrap">
+      <div class="empty-note">Aucune voiture rivale — entrez un numéro ci-dessus et cliquez Ajouter</div>
+    </div>
+  </div>
+
+  <!-- LAP HISTORY -->
+  <div class="lap-panel">
+    <div class="panel-title">Historique des tours</div>
+    <div class="lap-list" id="lapList"><div class="empty-note">En attente de connexion...</div></div>
+  </div>
+
+</div>
+
+<div class="footer">RACE MANAGER v1.1 — Données : live.ris-timing.be via Cloudflare Worker</div>
+
+<script>
+const WORKER = 'https://ris-proxy.joel-594.workers.dev/';
+const DEFAULT_UUID = '00000000-0000-0000-0000-000000000001';
+
+let timer = null;
+let lastData = null;
+let state = {
+  carNum:null, uuid:DEFAULT_UUID,
+  laps:[], lastLapNum:null, lastPitStopCount:null,
+  lapsSincePit:0, fuel:80, maxFuel:80,
+  avgConso:null, alertLaps:3, bestMs:null,
+  pitLapNums:[], fuelUsedSincePit:0,
+  rivals:[]
+};
+
+function fmtMs(ms){
+  if(!ms)return'—';
+  const m=Math.floor(ms/60000),s=Math.floor((ms%60000)/1000),mm=ms%1000;
+  return m+':'+(s<10?'0':'')+s+'.'+(mm<100?(mm<10?'00':'0'):'')+mm;
+}
+function fmtSec(ms){return ms?(ms/1000).toFixed(3)+'s':'—';}
+function fmtMin(ms){
+  if(!ms)return'—';
+  const m=Math.floor(ms/60000),s=Math.floor((ms%60000)/1000);
+  return m+'m'+(s<10?'0':'')+s+'s';
+}
+function fmtGap(ms){
+  if(ms==null)return'—';
+  const abs=Math.abs(ms);
+  return (abs/1000).toFixed(2)+'s';
+}
+
+function startLive(){
+  const cn=parseInt(document.getElementById('carNum').value);
+  if(!cn){alert('Entrez un numéro de voiture');return;}
+  const uuid=document.getElementById('uuidInput').value.trim()||DEFAULT_UUID;
+  state.carNum=cn; state.uuid=uuid;
+  state.fuel=parseFloat(document.getElementById('fuelInit').value)||80;
+  state.maxFuel=state.fuel;
+  state.alertLaps=parseInt(document.getElementById('alertLaps').value)||3;
+  setBadge('CONNEXION...','');
+  if(timer)clearInterval(timer);
+  fetchData();
+  timer=setInterval(fetchData,5000);
+}
+
+function stopLive(){
+  if(timer){clearInterval(timer);timer=null;}
+  setBadge('PAUSÉ','');
+  document.getElementById('refreshNote').textContent='Rafraîchissement en pause';
+}
+
+function resetAll(){
+  stopLive();
+  state={carNum:null,uuid:DEFAULT_UUID,laps:[],lastLapNum:null,lastPitStopCount:null,lapsSincePit:0,fuel:80,maxFuel:80,avgConso:null,alertLaps:3,bestMs:null,pitLapNums:[],fuelUsedSincePit:0,rivals:[]};
+  lastData=null;
+  ['mLap','mSincePit','mFuel','mLeft','lastLapBig','bestLapVal','s1Val','s2Val','s3Val','fuelPct'].forEach(id=>{document.getElementById(id).textContent='—';});
+  document.getElementById('mFuelSub').textContent='—';
+  document.getElementById('consoVal').textContent='à calculer';
+  document.getElementById('stopsLine').textContent='Arrêts : — | Temps stand total : —';
+  document.getElementById('fuelBar').style.width='0%';
+  document.getElementById('alertDiv').style.display='none';
+  document.getElementById('carBar').style.display='none';
+  document.getElementById('sessionName').textContent='—';
+  document.getElementById('lapList').innerHTML='<div class="empty-note">Réinitialisé</div>';
+  document.getElementById('rivalsTableWrap').innerHTML='<div class="empty-note">Aucun rival configuré</div>';
+  setBadge('DÉCONNECTÉ','');
+}
+
+function setBadge(text,type){
+  const b=document.getElementById('statusBadge');
+  b.textContent=text;
+  b.className='status-pill'+(type?' '+type:'');
+}
+
+async function fetchData(){
+  try{
+    const resp=await fetch(WORKER+'?uuid='+state.uuid,{cache:'no-store'});
+    if(!resp.ok)throw new Error('HTTP '+resp.status);
+    const data=await resp.json();
+    lastData=data;
+    processData(data);
+    const now=new Date().toLocaleTimeString('fr-BE');
+    document.getElementById('refreshNote').textContent='↻ Mis à jour à '+now+' — prochaine mise à jour dans 5s';
+    setBadge('LIVE','live');
+  }catch(e){
+    setBadge('ERREUR','error');
+    document.getElementById('refreshNote').textContent='✕ Erreur : '+e.message;
+    showAlert('danger','⚠ Impossible de récupérer les données. Vérifiez votre connexion.');
+  }
+}
+
+function processData(data){
+  const ctx=data.context||{};
+  if(ctx.race){
+    document.getElementById('sessionName').textContent=
+      [ctx.race.name,ctx.session?.name,ctx.series?.name].filter(Boolean).join(' — ');
+  }
+
+  const car=(data.cars||[]).find(c=>c.car_number===state.carNum);
+  if(!car){showAlert('info','ℹ Voiture #'+state.carNum+' non trouvée.');return;}
+
+  // Car info bar
+  document.getElementById('carBar').style.display='block';
+  document.getElementById('ciNum').textContent='#'+car.car_number;
+  document.getElementById('ciTeam').textContent=car.team||'—';
+  document.getElementById('ciDriver').textContent=car.driver||'—';
+  document.getElementById('ciPos').textContent='P'+car.position;
+  const cs=car.lap?.car_state;
+  const ciEl=document.getElementById('ciState');
+  if(cs==='RUN'){ciEl.textContent='● EN PISTE';ciEl.className='tag tag-run';}
+  else if(cs==='IN'){ciEl.textContent='● AU STAND';ciEl.className='tag tag-in';}
+  else{ciEl.textContent=cs||'—';ciEl.className='tag tag-other';}
+
+  const lap=car.lap||{};
+  const stops=car.stops||{};
+  const lapNum=lap.lap_number;
+
+  document.getElementById('lastLapBig').textContent=fmtMs(lap.lap_time_ms);
+  document.getElementById('bestLapVal').textContent=fmtMs(lap.best_lap_ms);
+  document.getElementById('s1Val').textContent=fmtSec(lap.s1_ms);
+  document.getElementById('s2Val').textContent=fmtSec(lap.s2_ms);
+  document.getElementById('s3Val').textContent=fmtSec(lap.s3_ms);
+  document.getElementById('stopsLine').textContent='Arrêts : '+(stops.count??'—')+' | Temps stand total : '+fmtMin(stops.total_time_ms);
+  if(lap.best_lap_ms)state.bestMs=lap.best_lap_ms;
+
+  if(lapNum!=null&&lapNum!==state.lastLapNum){
+    if(state.lastLapNum!==null){
+      const newStopCount=stops.count||0;
+      const pitHappened=state.lastPitStopCount!==null&&newStopCount>state.lastPitStopCount;
+      if(pitHappened){
+        if(state.laps.length>0)state.laps[state.laps.length-1].pit=true;
+        state.pitLapNums.push(lapNum-1);
+        state.lapsSincePit=0; state.fuelUsedSincePit=0;
+        showAlert('info','🔧 Passage au stand détecté (tour '+(lapNum-1)+') — entrez les litres ajoutés.');
+      }else{
+        state.lapsSincePit++;
+        if(state.avgConso){state.fuel=Math.max(0,state.fuel-state.avgConso);state.fuelUsedSincePit+=state.avgConso;}
+      }
+      state.laps.push({num:lapNum,ms:lap.lap_time_ms,pit:pitHappened});
+    }
+    state.lastLapNum=lapNum; state.lastPitStopCount=stops.count||0;
+  }else if(state.lastLapNum===null){
+    state.lastLapNum=lapNum; state.lastPitStopCount=stops.count||0;
+  }
+
+  document.getElementById('mLap').textContent=lapNum??'—';
+  document.getElementById('mSincePit').textContent=state.lapsSincePit;
+
+  updateFuelUI();
+  renderLaps();
+  renderRivals(data.cars||[], car);
+}
+
+function addFuel(){
+  const v=parseFloat(document.getElementById('fuelAdded').value);
+  if(!v||v<=0)return;
+  if(state.lapsSincePit>0){
+    const newConso=(state.maxFuel-state.fuel+v)/state.lapsSincePit;
+    if(newConso>0)state.avgConso=state.avgConso?(state.avgConso*0.4+newConso*0.6):newConso;
+  }
+  state.fuel=Math.min(state.maxFuel,state.fuel+v);
+  state.lapsSincePit=0; state.fuelUsedSincePit=0;
+  document.getElementById('fuelAdded').value='';
+  updateFuelUI();
+}
+
+function updateFuelUI(){
+  const pct=state.maxFuel>0?Math.round(state.fuel/state.maxFuel*100):0;
+  document.getElementById('mFuel').textContent=state.fuel.toFixed(1)+' L';
+  document.getElementById('mFuelSub').textContent=pct+'% du réservoir';
+  document.getElementById('fuelPct').textContent=pct+'%';
+  const bar=document.getElementById('fuelBar');
+  bar.style.width=pct+'%';
+  bar.style.background=pct>30?'var(--green)':pct>15?'var(--amber)':'var(--red)';
+  if(state.avgConso&&state.avgConso>0){
+    const lapsLeft=Math.floor(state.fuel/state.avgConso);
+    document.getElementById('mLeft').textContent=lapsLeft;
+    document.getElementById('consoVal').textContent=state.avgConso.toFixed(2)+' L/tour';
+    const el=document.getElementById('mLeft');
+    if(lapsLeft<=state.alertLaps){el.className='metric-value red';showAlert('danger','⚠ ALERTE CARBURANT — plus que '+lapsLeft+' tour(s) ! AU STAND immédiatement.');}
+    else if(lapsLeft<=state.alertLaps+3){el.className='metric-value amber';showAlert('warn','▲ Attention — ~'+lapsLeft+' tours restants. Préparez le stand.');}
+    else{el.className='metric-value green';showAlert('ok','✓ Carburant OK — '+lapsLeft+' tours estimés restants.');}
+  }else{
+    document.getElementById('mLeft').textContent='—';
+    document.getElementById('mLeft').className='metric-value';
+    document.getElementById('consoVal').textContent='à calculer';
+  }
+}
+
+function showAlert(type,msg){
+  const div=document.getElementById('alertDiv');
+  div.style.display='flex'; div.className='alert '+type; div.textContent=msg;
+}
+
+function renderLaps(){
+  const list=document.getElementById('lapList');
+  if(!state.laps.length){list.innerHTML='<div class="empty-note">En attente du premier tour...</div>';return;}
+  let html='';
+  const rev=[...state.laps].reverse();
+  for(const lap of rev){
+    const origIdx=state.laps.findIndex(l=>l.num===lap.num);
+    const prev=origIdx>0?state.laps[origIdx-1]:null;
+    let delta='<span class="l-delta"></span>';
+    if(prev&&prev.ms&&lap.ms){
+      const d=lap.ms-prev.ms;
+      delta='<span class="l-delta" style="color:'+(d>0?'var(--red)':'var(--green)')+'">'+( d>0?'+':'')+( d/1000).toFixed(3)+'s</span>';
+    }
+    const isBest=lap.ms&&lap.ms===state.bestMs;
+    html+='<div class="lap-row-item">'
+      +'<span class="l-num">T'+lap.num+'</span>'
+      +'<span class="l-time">'+fmtMs(lap.ms)+'</span>'
+      +delta
+      +(isBest?'<span class="l-tag best">BEST</span>':'')
+      +(lap.pit?'<span class="l-tag pit">STAND</span>':'')
+      +'</div>';
+  }
+  list.innerHTML=html;
+}
+
+// ---- RIVALS ----
+function addRival(){
+  const n=parseInt(document.getElementById('rivalInput').value);
+  if(!n)return;
+  if(state.rivals.includes(n)){alert('Déjà dans la liste');return;}
+  if(state.rivals.length>=3){alert('Maximum 3 rivaux — supprimez-en un d\'abord');return;}
+  state.rivals.push(n);
+  document.getElementById('rivalInput').value='';
+  if(lastData)renderRivals(lastData.cars||[], (lastData.cars||[]).find(c=>c.car_number===state.carNum));
+  else renderRivals([],null);
+}
+
+function removeRival(n){
+  state.rivals=state.rivals.filter(r=>r!==n);
+  if(lastData)renderRivals(lastData.cars||[], (lastData.cars||[]).find(c=>c.car_number===state.carNum));
+  else renderRivals([],null);
+}
+
+function renderRivals(allCars, myCar){
+  const wrap=document.getElementById('rivalsTableWrap');
+  if(!state.rivals.length){
+    wrap.innerHTML='<div class="empty-note">Aucun rival — entrez un numéro ci-dessus et cliquez Ajouter</div>';
+    return;
+  }
+
+  // Construire la liste : ma voiture + rivaux, triés par position
+  const nums=[state.carNum, ...state.rivals].filter(Boolean);
+  const cars=nums.map(n=>allCars.find(c=>c.car_number===n)).filter(Boolean);
+  cars.sort((a,b)=>(a.position||99)-(b.position||99));
+
+  const myPos=myCar?.position;
+  const myLapMs=myCar?.lap?.lap_time_ms;
+
+  let html='<table class="rivals-table">'
+    +'<thead><tr>'
+    +'<th>Pos</th><th>N°</th><th>Équipe / Pilote</th><th>Dernier tour</th><th>Meilleur</th><th>Gap vs moi</th><th>État</th><th></th>'
+    +'</tr></thead><tbody>';
+
+  for(const car of cars){
+    const isMe=car.car_number===state.carNum;
+    const lap=car.lap||{};
+    const cs=lap.car_state;
+
+    // Gap : basé sur gaps.toLeader si disponible, sinon calcul position
+    let gapHtml='—';
+    if(isMe){
+      gapHtml='<span class="gap-zero">— MA VOITURE</span>';
+    } else if(myCar){
+      const myGapToLeader=myCar.gaps?.toLeader?.ms??null;
+      const rivGapToLeader=car.gaps?.toLeader?.ms??null;
+      const lapDiff=(car.gaps?.toLeader?.laps??0)-(myCar.gaps?.toLeader?.laps??0);
+
+      if(lapDiff!==0){
+        gapHtml='<span class="'+(lapDiff>0?'gap-behind':'gap-ahead')+'">'+(lapDiff>0?'+':'')+lapDiff+' tour'+(Math.abs(lapDiff)>1?'s':'')+'</span>';
+      } else if(myGapToLeader!==null&&rivGapToLeader!==null){
+        const diff=rivGapToLeader-myGapToLeader;
+        const cls=diff>0?'gap-behind':'gap-ahead';
+        const sign=diff>0?'+':'';
+        gapHtml='<span class="'+cls+'">'+sign+fmtGap(diff)+'</span>';
+      } else if(myGapToLeader===null&&rivGapToLeader===null){
+        gapHtml='<span class="gap-zero">leader</span>';
+      }
+    }
+
+    const stateLabel=cs==='RUN'?'<span class="state-run">● piste</span>':cs==='IN'?'<span class="state-in">● stand</span>':(cs||'—');
+    const removeBtn=isMe?'':('<button class="btn-sm" onclick="removeRival('+car.car_number+')">✕</button>');
+
+    html+='<tr class="'+(isMe?'my-car':'')+'">'
+      +'<td><strong>'+(car.position||'—')+'</strong></td>'
+      +'<td class="riv-num">#'+car.car_number+'</td>'
+      +'<td class="riv-team">'+(car.team||'—')+'<br><span style="color:var(--text3);font-size:10px">'+(car.driver||'')+'</span></td>'
+      +'<td class="riv-time">'+fmtMs(lap.lap_time_ms)+'</td>'
+      +'<td class="riv-time">'+fmtMs(lap.best_lap_ms)+'</td>'
+      +'<td>'+gapHtml+'</td>'
+      +'<td>'+stateLabel+'</td>'
+      +'<td>'+removeBtn+'</td>'
+      +'</tr>';
+  }
+
+  html+='</tbody></table>';
+  wrap.innerHTML=html;
+}
+</script>
+</body>
+</html>
